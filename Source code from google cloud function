@@ -1,0 +1,190 @@
+
+•	import com.google.cloud.functions.HttpFunction;
+•	import com.google.cloud.functions.HttpRequest;
+•	import com.google.cloud.functions.HttpResponse;
+•	import java.io.BufferedWriter;
+•	import chart.js; 
+•	
+•	public class Example implements HttpFunction {
+•	  @Override
+•	  public void service(HttpRequest request, HttpResponse response) throws Exception {
+•	    BufferedWriter writer = response.getWriter();
+•	   <!-- begin snippet: js hide: false console: true babel: null -->
+•	
+•	<!-- language: lang-js -->
+•	
+•	    function tableCreate() {
+•	      //body reference 
+•	      var body = document.getElementsByTagName("body")[0];
+•	
+
+•	      // create elements <table> and a <tbody>
+•	      var tbl = document.createElement("table");
+•	      var tblBody = document.createElement("tbody");
+•	
+•	      // cells creation
+•	      for (var j = 0; j <= 2; j++) {
+•	        // table row creation
+•	        var row = document.createElement("tr");
+•	
+•	        for (var i = 0; i < 2; i++) {
+•	          // create element <td> and text node 
+•	          //Make text node the contents of <td> element
+•	          // put <td> at end of the table row
+•	          var cell = document.createElement("td");
+•	          var cellText = document.createTextNode("cell is row " + j + ", column " + i);
+•	
+•	          cell.appendChild(cellText);
+•	          row.appendChild(cell);
+•	        }
+•	
+•	        //row added to end of table body
+•	        tblBody.appendChild(row);
+•	      }
+•	
+•	      // append the <tbody> inside the <table>
+•	      tbl.appendChild(tblBody);
+•	      // makes table variation of pink colors 
+•	       tbl.appearance(pinkvariation);
+•	      // put <table> in the <body>
+•	      body.appendChild(tbl);
+•	      // tbl border attribute to 
+•	      tbl.setAttribute("border", "2");
+•	    }
+•	
+•	<!-- language: lang-html -->
+•	
+•	    <table width="100%" border="1">
+•	      <tr>
+•	        <td>&nbsp;</td>
+•	        <td>&nbsp;</td>
+•	      </tr>
+•	      <tr>
+•	        <td>&nbsp;</td>
+•	        <td rowspan="2">&nbsp;</td>
+•	      </tr>
+•	      <tr>
+•	        <td>&nbsp;</td>
+•	      </tr>
+•	    </table>
+•	
+•	<!-- end snippet -->
+•	
+•	// for the graph 
+•	<!DOCTYPE html>
+•	<html>
+•	<head>
+•	  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+•	</head>
+•	
+•	<body>
+•	// creates the bars
+•	   
+•	    <canvas id="bar-chart" width=300" height="150"></canvas>
+•	
+•	   
+•	    <script>
+•	  //chart for large and small openings 
+•	new Chart(document.getElementById("Hour 1"), {
+•	    type: 'bar',
+•	    data: {
+•	      labels: ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60"],
+•	      datasets: [
+•	        {
+•	          label: "Large openings",
+•	          backgroundColor: ["blue"],
+•	          label: "Small openings",
+•	          backgroundColor: ["green"],
+•	          data: [insert ("graph-from-data")],
+•	        }
+•	      ]
+•	    },
+•	    options: {
+•	      legend: { display: false },
+•	      title: {
+•	        display: true,
+•	        text: 'Number of Developers in Every Continent'
+•	      },
+•	
+•	      scales: {
+•	            yAxes: [{
+•	                ticks: {
+•	                    beginAtZero:true
+•	                }
+•	            }]
+•	        }
+•	
+•	    }
+•	
+•	  //chart for total closings 
+•	new Chart(document.getElementById("Hour 1"), {
+•	    type: 'bar',
+•	    data: {
+•	      labels: ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60"],
+•	      datasets: [
+•	        {
+•	          label: "Number of closings",
+•	          backgroundColor: ["green"],
+•	          data: [insert ("graph-from-data")],
+•	        }
+•	      ]
+•	    },
+•	    options: {
+•	      legend: { display: false },
+•	      title: {
+•	        display: true,
+•	        text: 'Number of Developers in Every Continent'
+•	      },
+•	
+•	      scales: {
+•	            yAxes: [{
+•	                ticks: {
+•	                    beginAtZero:true
+•	                }
+•	            }]
+•	        }
+•	
+•	    }
+•	
+•	});
+•	
+•	    </script>
+•	   
+•	   
+•	 //chart for total openings 
+•	new Chart(document.getElementById("Hour 1"), {
+•	    type: 'bar',
+•	    data: {
+•	      labels: ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60"],
+•	      datasets: [
+•	        {
+•	          label: "Number of openings",
+•	          backgroundColor: ["green"],
+•	          data: [insert ("graph-from-data")],
+•	        }
+•	      ]
+•	    },
+•	    options: {
+•	      legend: { display: false },
+•	      title: {
+•	        display: true,
+•	        text: 'Number of Developers in Every Continent'
+•	      },
+•	
+•	      scales: {
+•	            yAxes: [{
+•	                ticks: {
+•	                    beginAtZero:true
+•	                }
+•	            }]
+•	        }
+•	
+•	    }
+•	
+•	});
+•	</body>
+•	</html>
+•	
+•	  }
+•	}
+

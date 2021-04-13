@@ -1,0 +1,421 @@
+.  Source Code for Google Collab Function 
+
+### **1** #starts the process of taking the picture and starts the camera 
+
+!pip install pyheif
+//this installs important packages 
+import os
+import numpy as np
+import torch
+import torch.utils.data
+import pyheif
+from PIL import Image
+
+#sets duration of program and frequency of camera being taken 
+
+fscamera - 00060
+fsduration - 00D 00H 00M 00S
+class RandDataset(torch.utils.data.Dataset):
+    def __init__(self, root, transforms=None, mode = 'train'):
+        self.root = root
+        self.transforms = transforms
+        self.mode = mode
+        # load all image files, sorting them to
+        # ensure that they are aligned
+        if self.mode == 'train':
+            imgs_close = list(sorted(os.listdir(os.path.join(root, 'Train_closed_oyster_shells'))))
+            lbl_close = np.zeros(len(imgs_close))
+            imgs_open = list(sorted(os.listdir(os.path.join(root, 'Train_large_open_oyster_shells'))))
+            lbl_open = np.ones(len(imgs_open))
+        else:
+            imgs_close = list(sorted(os.listdir(os.path.join(root, 'Test_closed_oyster_shells'))))
+            lbl_close = np.zeros(len(imgs_close))
+            imgs_open = list(sorted(os.listdir(os.path.join(root, 'Test_large_open_oyster_shells'))))
+            lbl_open = np.ones(len(imgs_open))
+
+        self.imgs = imgs_close + imgs_open
+        self.labels = np.concatenate((lbl_close, lbl_open))
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        # load images ad masks
+        if self.mode == 'train':
+            if os.path.isfile(os.path.join(self.root, 'Train_closed_oyster_shells', self.imgs[idx])):
+                imgs_path = os.path.join(self.root, 'Train_closed_oyster_shells', self.imgs[idx])
+
+            if os.path.isfile(os.path.join(self.root, 'Train_large_open_oyster_shells', self.imgs[idx])):
+                imgs_path = os.path.join(self.root, 'Train_large_open_oyster_shells', self.imgs[idx])
+        
+        else:
+            if os.path.isfile(os.path.join(self.root, 'Test_closed_oyster_shells', self.imgs[idx])):
+                imgs_path = os.path.join(self.root, 'Test_closed_oyster_shells', self.imgs[idx])
+
+            if os.path.isfile(os.path.join(self.root, 'Test_large_open_oyster_shells', self.imgs[idx])):
+                imgs_path = os.path.join(self.root, 'Test_large_open_oyster_shells', self.imgs[idx])
+
+        heif_file = pyheif.read(imgs_path)
+        img = Image.frombytes(
+            heif_file.mode, 
+            heif_file.size, 
+            heif_file.data,
+            "raw",
+            heif_file.mode,
+            heif_file.stride,
+            )
+        if self.transforms is not None:
+            img = self.transforms(img)
+        lbl = self.labels[idx]
+        
+        return img, torch.tensor(lbl, dtype=torch.long)   
+
+#Data Transform – transforms data into readable image 
+import torchvision.transforms as T
+
+
+def get_transform(train):
+    transforms = []
+    # converts the image, a PIL image, into a PyTorch Tensor
+    transforms.append(T.Resize((224,224)))
+    transforms.append(T.ToTensor())
+    transforms.append(T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]))
+    if train:
+        # during training, randomly flip the training images
+        # and ground-truth for data augmentation
+        transforms.append(T.RandomHorizontalFlip(0.5))
+    return T.Compose(transforms)
+
+dataset = RandDataset('Data', get_transform(train=True))
+dataset_test = RandDataset('Data', get_transform(train=False),  mode = 'val')
+
+print(len(dataset))
+print(len(dataset_test))
+
+data_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True, pin_memory=True)
+data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=32, shuffle=False)
+
+# Inverse Transform
+import matplotlib.pyplot as plt
+
+inv_normalize = T.Normalize(
+    mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225],
+    std=[1/0.229, 1/0.224, 1/0.255]
+)
+
+def imshow(img):
+    img = inv_normalize(img)     # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
+
+# Visualise Data Loader
+import torchvision
+imag, labl = next(iter(data_loader_test))
+imshow(torchvision.utils.make_grid(imag))
+print(labl)
+
+# 2
+
+import torchvision
+class ResNetBackbone34(torch.nn.Module):
+    def __init__(self, out_filters=2):
+        super(ResNetBackbone34, self).__init__()
+
+        self.res = torchvision.models.resnet34(pretrained=True)
+        fltr = self.res.fc.in_features
+        self.res.fc = torch.nn.Linear(fltr, out_filters)
+
+    def forward(self, x):
+        x = self.res(x)
+        return torch.nn.functional.softmax(x)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = ResNetBackbone34()
+model.to(device)
+
+# 3
+
+
+# Define the training parameters and function for optimise the parameters
+epochs = 30
+max_lr = 0.01
+grad_clip = 0.1
+weight_decay = 1e-4
+val_acc = 0
+
+loss_fn = torch.nn.CrossEntropyLoss()
+
+optimizer = torch.optim.Adam(model.parameters(), max_lr, weight_decay=weight_decay)
+
+sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr, epochs=epochs, 
+                                                steps_per_epoch=len(data_loader))
+
+# Load and save the checkpoints
+def save_checkpoint(save_path, model, val_loss, val_acc, start_epoch):
+
+    if save_path == None:
+        return
+    
+    state_dict = {'model_state_dict': model.state_dict(),
+                  'val_loss': val_loss,
+                  'val_acc' : val_acc,
+                  'start_epoch' : start_epoch}
+    
+    torch.save(state_dict, save_path)
+    print(f'Model saved to ==> {save_path}')
+
+def load_checkpoint(load_path, model, device='cpu'):
+    
+    if load_path==None:fswebcam -r 720x1280 3.jpg
+        return
+    
+    state_dict = torch.load(load_path, map_location=device)
+    print(f'Model loaded from <== {load_path}')
+    
+    model.load_state_dict(state_dict['model_state_dict'])
+    epoch = state_dict['start_epoch']
+    return epoch
+
+# Training and Evaluaton
+for epoch in range(epochs):
+    model.train()
+    train_losses = 0
+    i = 1
+    for batch in data_loader:
+        print('{}/{} starting...'.format(i, len(data_loader)))
+        i += 1
+        img = batch[0].to(device)
+        label = batch[1].to(device)
+
+        optimizer.zero_grad()
+        pred = model(img)
+
+        loss = loss_fn(pred, label)
+        loss.backward()
+
+        #torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip)
+        optimizer.step()
+        sched.step() 
+        train_losses += loss.item()
+
+    
+
+    with torch.no_grad():
+        correct = 0
+        total = 0
+        model.eval()
+        val_loss = 0
+        for batch in data_loader_test:
+            img = batch[0].to(device)
+            label = batch[1].to(device)
+
+            pred = model(img)
+
+            _, predicted = torch.max(pred.data, 1)
+            total += label.size(0)
+            correct += (predicted == label).sum().item()
+            
+            loss = loss_fn(pred, label)
+            val_loss += loss.item()
+
+        acc = 100 * (correct/total)
+        val_loss = val_loss/len(data_loader_test)
+        if acc>val_acc:
+            save_checkpoint('weights_andr/epoch_'+str(epoch+1), model, val_loss, acc, epoch)
+            val_acc = acc
+    print('Epoch {}/{}, train_loss {}, valid_loss {}, valid_acc {}'.format(epoch+1, epochs, train_losses/len(data_loader), val_loss, acc))     
+
+
+# 4
+
+model = ResNetBackbone34()
+load_checkpoint('/content/epoch_11', model)
+
+model.to(device)
+
+correct = 0
+total = 0
+#test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, pin_memory=True)
+with torch.no_grad():
+    model.eval()
+
+    for batch in data_loader_test:
+        img = batch[0].to(device)
+        label = batch[1].to(device)
+
+        pred = model(img)
+        _, predicted = torch.max(pred.data, 1)
+        print(predicted, label)
+        total += label.size(0)
+        correct += (predicted == label).sum().item()
+
+print('accuracy is ', correct/total)
+
+!cp '/content/weights_andr/epoch_11' -r '/content/Dropbox/MyDropBox/work/weights_andr'
+
+# 5
+
+#sends info to dropbox 
+#https://dropbox.com/file/d/1zSm6cOwzhA4llN2cRZ63HJ6om4h34eD8/view?usp=sharing
+!gdown --id 1zSm6cOwzhA4llN2cRZ63HJ6om4h34eD8
+
+# Load the trained model
+model = ResNetBackbone34()
+state_dict = torch.load("/content/epoch_11", torch.device("cpu"))
+model.load_state_dict(state_dict['model_state_dict'])
+
+from google.colab import files
+uploaded = files.upload()
+file_names, _ = list(uploaded.items())[0]
+
+#Test just update the file_names 
+from PIL import Image
+import pyheif
+
+file_names = '/content/Data/Test_closed_oyster_shells/IMG_0685.HEIC'
+
+heif_file = pyheif.read(file_names)
+image = Image.frombytes(
+    heif_file.mode, 
+    heif_file.size, 
+    heif_file.data,
+    "raw",
+    heif_file.mode,
+    heif_file.stride,
+    )
+
+trans_fn = get_transform(train=False)
+test_image = trans_fn(image)
+test_image = test_image.unsqueeze(dim=0)
+pred = model(test_image.to(device))
+_, predicted = torch.max(pred.data, 1)
+predicted
+
+classes = ['Close', 'Open']
+print('Predicted class is ',classes[predicted.item()])
+ 
+#adds arguments & layers to the project 
+
+ap = argparse.ArgumentParser()
+	ap.add_argument('-i', '--image', required=True,
+	                help = 'path to input image')
+	ap.add_argument('-c', '--config', required=True,
+	                help = 'path to yolo config file')
+	ap.add_argument('-w', '--weights', required=True,
+	                help = 'path to yolo pre-trained weights')
+	ap.add_argument('-cl', '--classes', required=True,
+	                help = 'path to text file containing class names')
+	args = ap.parse_args()
+	
+#gives output layers 
+
+	
+
+	def get_output_layers(net):
+	    
+	    layer_names = net.getLayerNames()
+	    
+	    output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+	
+
+	    return output_layers
+	
+#labels predictions, gives color for rectangle, gives font, etc, gives width, height, and scale for label and rectangle 
+
+	
+
+	def draw_prediction(img, class_id, confidence, x, y, x_plus_w, y_plus_h):
+	
+
+	    label = str(classes[class_id])
+	
+
+	    color = COLORS[green]
+	
+
+	    cv2.rectangle(img, (x,y), (x_plus_w,y_plus_h), color, 2)
+	
+
+	    cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+	
+
+	    
+	image = cv2.imread(args.image)
+	
+
+	Width = image.shape[1]
+	Height = image.shape[0]
+	scale = 0.00392
+	
+
+	#gives categories of different classes
+classes = None
+	
+
+	with open(args.classes, 'r') as f:
+	    classes = [line.strip() for line in f.readlines()]
+	
+
+	COLORS = np.random.uniform(0, 255, size=(len(classes), 3))
+	
+
+	net = cv2.dnn.readNet(args.weights, args.config)
+	
+
+	blob = cv2.dnn.blobFromImage(image, scale, (416,416), (0,0,0), True, crop=False)
+	
+
+	net.setInput(blob)
+	
+
+	outs = net.forward(get_output_layers(net))
+	
+
+	class_ids = []
+	confidences = []
+	boxes = []
+	conf_threshold = 0.5
+	nms_threshold = 0.4
+	
+
+	
+
+	for out in outs:
+	    for detection in out:
+	        scores = detection[5:]
+	        class_id = np.argmax(scores)
+	        confidence = scores[class_id]
+	        if confidence > 0.5:
+	            center_x = int(detection[0] * Width)
+	            center_y = int(detection[1] * Height)
+	            w = int(detection[2] * Width)
+	            h = int(detection[3] * Height)
+	            x = center_x - w / 2
+	            y = center_y - h / 2
+	            class_ids.append(class_id)
+	            confidences.append(float(confidence))
+	            boxes.append([x, y, w, h])
+	
+
+	
+
+	indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
+	
+
+	for i in indices:
+	    i = i[0]
+	    box = boxes[i]
+	    x = box[0]
+	    y = box[1]
+	    w = box[2]
+	    h = box[3]
+	    draw_prediction(image, class_ids[i], confidences[i], round(x), round(y), round(x+w), round(y+h))
+
+	#labels image 
+
+	cv2.imshow("name", image)
+	cv2.waitKey()
+	    
+	cv2.imwrite("name.jpg", image)
+	cv2.destroyAllWindows()

@@ -1,0 +1,19 @@
+sudo apt-get install motion #INTALLS NESSESARY PACKAGES 
+lsusb #INTALLS NESSESARY PACKAGES
+sudo cat /proc/mounts 
+sudo nano /etc/motion/motion.conf #GOES TO CONFIGURATION PAGE
+#THE FOLLOWING CHANGES ALL PARAMETERS NEEDED FOR THE TIME LAPSE TO WORK
+'ctrl + w' 
+'ctrl + w'  + 'daemon' #Makes sure 'daemon' is ON.
+'ctrl + w' + 'framerate'  #Set 'framerate' anywhere in between 1000 to 1500.
+'ctrl + w' + 'Stream_quality' #Stream_quality should be 100.
+'ctrl + w' + ‘'Stream_localhost'’ #Change 'Stream_localhost' to OFF.
+'ctrl + w' + 'webcontrol_localhost' #Change 'webcontrol_localhost' to OFF.
+'ctrl + w' + ‘quality' Set 'quality' to 100.
+'ctrl + w' + 'width' & 'height' #Set 'width' & 'height' to 1280 & 720.
+'ctrl + w' + 'Snapshot_interval'  #Set 'Snapshot_interval' equals to 10. ( every 10 seconds 1 photo will be taken )
+'ctrl + w' + 'target_dir' #Set 'target_dir' as the path that was stated earlier.
+'sudo nano /etc/default/motion ' #ALLOWS USER TO SEE CONFIGURATION
+' start_motion_daemon ' # TURNS ON DAEMON FEATURE
+'sudo service motion restart'#RESTARTS SYSTEM TO PREPARE FOR PICTURE TAKING
+'sudo motion' #STARTS TAKING PICTURES 

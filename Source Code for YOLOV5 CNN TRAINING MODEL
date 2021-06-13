@@ -1,0 +1,93 @@
+# this will install the nessesary dependencies needed for the project. it will clone YOLOv5 repository
+!git clone https://github.com/ultralytics/yolov5  # clone repo
+%cd yolov5
+!git reset --hard 886f1c03d839575afecb059accf74296fad395b6
+# install dependencies as necessary
+!pip install -qr requirements.txt  # install dependencies (ignore errors)
+import torch #imports torch, which is a necessary application which provides different dimensional #arrays, making it compatible and ideal to work with a neural network
+from IPython.display import Image, clear_output  #used to display images
+from utils.google_utils import gdrive_download  #used to download models/datasets
+# clear_output()
+print('Setup complete. Using torch %s %s' % (torch.__version__, torch.cuda.get_device_properties(0) if torch.cuda.is_available() else 'CPU')) #displays message that shows the setup for installing the dependencies is complete 
+#The code is exported and pasted here
+%cd /content
+!curl -L "https://app.roboflow.com/ds/REPLACE-THIS-LINK" > roboflow.zip; unzip roboflow.zip; rm roboflow.zip
+# this is the YAML file Roboflow wrote for us that we're loading into this notebook with our data
+%cat data.yaml
+# the following defines the parameter of our model…it is used to define number of classes based on YAML
+import yaml
+with open("data.yaml", 'r') as stream:
+    num_classes = str(yaml.safe_load(stream)['nc'])
+#this is the model configuration we will use for our tutorial. when launched, it will show the parameters.
+%cat /content/yolov5/models/yolov5s.yaml
+
+
+
+
+%cat /content/yolov5/models/yolov5s.yaml
+#this customizes the python file so we can write and change variables and parameters to the model
+from IPython.core.magic import register_line_cell_magic
+
+@register_line_cell_magic
+def writetemplate(line, cell):
+    with open(line, 'w') as f:
+        f.write(cell.format(**globals()))
+%%writetemplate /content/yolov5/models/custom_yolov5s.yaml
+
+# parameters
+nc: {num_classes}  # number of classes
+depth_multiple: 0.33  # model depth multiple
+width_multiple: 0.50  # layer channel multiple
+# anchors
+anchors:
+  - [10,13, 16,30, 33,23]  # P3/8
+  - [30,61, 62,45, 59,119]  # P4/16
+  - [116,90, 156,198, 373,326]  # P5/32
+
+# Parameters in YOLOv5 that define the head, neck, and backbone. These include the following #parameters:
+#img: define input image size
+#batch: determine batch size
+#epochs: define the number of training epochs. (Note: often, 3000+ are common here!)
+#data: set the path to our yaml file
+#cfg: specify our model configuration
+#weights: specify a custom path to weights. (Note: you can download weights from the Ultralytics Google Drive folder)
+#name: result names
+#nosave: only save the final checkpoint
+#cache: cache’s images for more efficient and faster training
+# train yolov5s on custom data for 35 epochs
+# time its performance
+%%time
+%cd /content/yolov5/
+!python train.py --img 416 --batch 16 --epochs 35 --data '../data.yaml' --cfg ./models/custom_yolov5s.yaml --weights '' --name yolov5s_results  --cache
+#The following below will evaluate the YOLOv5 model. It saves the graph on tenser board to your #computer for you to see the visual program being made in the training process via a graph
+# Start tensorboard
+# Launch after you have started training
+# logs save in the folder "runs"
+%load_ext tensorboard
+%tensorboard --logdir runs
+#the following is the beginning step for physically showing the training data with labels
+# first, display our ground truth data. it will depict the data with the labels around it
+print("GROUND TRUTH TRAINING DATA:")
+Image(filename='/content/yolov5/runs/train/yolov5s_results/test_batch0_labels.jpg', width=900)
+# this will print out an augmented example of a picture trained with labels. 
+print("GROUND TRUTH AUGMENTED TRAINING DATA:")
+Image(filename='/content/yolov5/runs/train/yolov5s_results/train_batch0.jpg', width=900)
+# the following will run predictions with the trained weights # trained weights are saved by default in our weights folder
+%ls runs/
+%ls runs/train/yolov5s_results/weights
+%cd /content/yolov5/
+!python detect.py --weights runs/train/yolov5s_results/weights/best.pt --img 416 --conf 0.4 --source ../test/images
+#this will display the predictions on ALL test images
+
+import glob
+from IPython.display import Image, display
+
+for imageName in glob.glob('/content/yolov5/runs/detect/exp/*.jpg'): #assuming JPG
+    display(Image(filename=imageName))
+    print("\n")
+
+#this will export trained weights to a google drive folder
+from google.colab import drive
+drive.mount('/content/gdrive')
+%cp /content/yolov5/runs/train/yolov5s_results/weights/best.pt /content/gdrive/My\ Drive
+ 
